@@ -45,6 +45,21 @@ const orderSchema = mongoose.Schema(
     comments: {
       type: String,
     },
+    statusHistory: [
+      {
+        previousStatus: String,
+        newStatus: String,
+        changedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        role: String,
+        changedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   { timestamps: true }
 );

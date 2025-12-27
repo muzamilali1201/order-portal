@@ -49,7 +49,7 @@ cron.schedule("0 2 * * *", async () => {
     fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
 
     const reviewAwaitedOrders = await Order.find({
-      status: "REVIEW_AWAITED",
+      status: "REVIEWED",
       updatedAt: { $lte: fiveDaysAgo },
     });
 

@@ -187,26 +187,27 @@ const ordersController = {
         message: "Order not found",
       });
     }
-    const oldStatus = order.status;
 
+    const oldStatus = order.status;
     const userRole = req.user.role;
 
+    // 🔐 Role-based validation
     if (userRole === "admin") {
       if (!ADMIN_ALLOWED_STATUSES.includes(status)) {
         return res.status(400).json({
           success: false,
-          message: `Admin cannot set status to "${status}. Available statuses: ${ADMIN_ALLOWED_STATUSES.join(
+          message: `Admin cannot set status to "${status}". Allowed: ${ADMIN_ALLOWED_STATUSES.join(
             ", "
-          )}"`,
+          )}`,
         });
       }
     } else if (userRole === "user") {
       if (!USER_ALLOWED_STATUSES.includes(status)) {
         return res.status(400).json({
           success: false,
-          message: `User cannot set status to "${status}. Available statuses: ${USER_ALLOWED_STATUSES.join(
+          message: `User cannot set status to "${status}". Allowed: ${USER_ALLOWED_STATUSES.join(
             ", "
-          )}"`,
+          )}`,
         });
       }
 
@@ -218,9 +219,27 @@ const ordersController = {
       }
     }
 
+    // 🚫 Prevent redundant updates
+    if (oldStatus === status) {
+      return res.status(400).json({
+        success: false,
+        message: "Order is already in this status",
+      });
+    }
+
+    // ✅ Update order + push status history
     order.status = status;
+    order.statusHistory.push({
+      previousStatus: oldStatus,
+      newStatus: status,
+      changedBy: req.user._id,
+      role: req.user.role,
+      changedAt: new Date(),
+    });
+
     await order.save();
 
+    // 🧾 Optional: keep global alert collection (for feed)
     await alertSystem.create({
       orderId: order._id,
       changedBy: req.user._id,
@@ -229,6 +248,7 @@ const ordersController = {
       newStatus: status,
     });
 
+    // 🔴 Real-time event (everyone sees)
     const io = getIO();
     io.emit("order-status-changed", {
       orderId: order._id,
@@ -253,7 +273,22 @@ const ordersController = {
 
     const order = await Order.findById(orderId)
       .populate("userId", "email username")
+      .populate("statusHistory.changedBy", "email username")
       .lean();
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    // 🔄 Sort statusHistory (latest first)
+    if (Array.isArray(order.statusHistory)) {
+      order.statusHistory.sort(
+        (a, b) => new Date(b.changedAt) - new Date(a.changedAt)
+      );
+    }
 
     res.status(200).json({
       success: true,
