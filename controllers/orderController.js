@@ -22,13 +22,22 @@ const ADMIN_ALLOWED_STATUSES = [
   "CANCELLED",
   "COMISSION_COLLECTED",
   "PAID",
+  "SEND_TO_SELLER",
+  "HOLD",
+  "SENT",
 ];
 
-const USER_ALLOWED_STATUSES = ["REVIEWED", "CANCELLED", "CORRECTED"];
+const USER_ALLOWED_STATUSES = [
+  "REVIEWED",
+  "CANCELLED",
+  "ORDERED",
+  "REFUND_DELAYED",
+];
 
 const ordersController = {
   createOrder: asyncHandler(async (req, res) => {
-    const { amazonOrderNo, buyerPaypal, orderName, comments } = req.body;
+    const { amazonOrderNo, buyerPaypal, orderName, comments, buyerName } =
+      req.body;
 
     if (!req.files?.OrderSS || !req.files?.AmazonProductSS) {
       return res.status(400).json({
@@ -47,8 +56,14 @@ const ordersController = {
       "screenshots/amazon"
     );
 
+    const refundSSKey = await uploadToR2(
+      req.files.RefundSS[0],
+      "screenshots/refund"
+    );
+
     const orderSSUrl = `${process.env.R2_PUBLIC_URL}/${orderSSKey}`;
     const productSSUrl = `${process.env.R2_PUBLIC_URL}/${productSSKey}`;
+    const refundSSUrl = `${process.env.R2_PUBLIC_URL}/${refundSSKey}`;
 
     const order = await Order.create({
       userId: req.user._id,
@@ -58,6 +73,8 @@ const ordersController = {
       comments,
       OrderSS: orderSSUrl,
       AmazonProductSS: productSSUrl,
+      RefundSS: refundSSUrl,
+      buyerName,
     });
 
     res.status(201).json({
@@ -82,6 +99,7 @@ const ordersController = {
       "CANCELLED",
       "COMISSION_COLLECTED",
       "PAID",
+      "SEND_TO_SELLER",
     ];
 
     if (filterBy && !allowedStatuses.includes(filterBy)) {

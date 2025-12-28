@@ -25,8 +25,8 @@ router.post(
   upload.fields([
     { name: "OrderSS", maxCount: 1 },
     { name: "AmazonProductSS", maxCount: 1 },
+    { name: "RefundSS", maxCount: 1 },
   ]),
-
   validate(createOrderSchema), // 3️⃣ Validate parsed req.body
 
   ordersController.createOrder // 4️⃣ Business logic

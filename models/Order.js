@@ -19,6 +19,9 @@ const orderSchema = mongoose.Schema(
         "CANCELLED",
         "COMISSION_COLLECTED",
         "PAID",
+        "SEND_TO_SELLER",
+        "HOLD",
+        "SENT"
       ],
       default: "ORDERED",
     },
@@ -27,6 +30,10 @@ const orderSchema = mongoose.Schema(
       required: true,
     },
     buyerPaypal: {
+      type: String,
+      required: true,
+    },
+    buyerName: {
       type: String,
       required: true,
     },
@@ -39,6 +46,10 @@ const orderSchema = mongoose.Schema(
       required: true,
     },
     AmazonProductSS: {
+      type: String,
+      required: true,
+    },
+    RefundSS: {
       type: String,
       required: true,
     },
