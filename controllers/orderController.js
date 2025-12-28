@@ -56,14 +56,8 @@ const ordersController = {
       "screenshots/amazon"
     );
 
-    const refundSSKey = await uploadToR2(
-      req.files.RefundSS[0],
-      "screenshots/refund"
-    );
-
     const orderSSUrl = `${process.env.R2_PUBLIC_URL}/${orderSSKey}`;
     const productSSUrl = `${process.env.R2_PUBLIC_URL}/${productSSKey}`;
-    const refundSSUrl = `${process.env.R2_PUBLIC_URL}/${refundSSKey}`;
 
     const order = await Order.create({
       userId: req.user._id,
@@ -73,7 +67,6 @@ const ordersController = {
       comments,
       OrderSS: orderSSUrl,
       AmazonProductSS: productSSUrl,
-      RefundSS: refundSSUrl,
       buyerName,
     });
 
@@ -191,6 +184,25 @@ const ordersController = {
     const { orderId } = req.params;
     const { status } = req.body;
 
+    if (req.user.role !== "admin" && req?.files?.RefundSS[0]) {
+      return res.status(400).json({
+        success: false,
+        message: "Only admin can upload refund screenshot",
+      });
+    }
+
+    let refundSSKey = null;
+
+    if (req?.files?.RefundSS[0])
+      refundSSKey = await uploadToR2(
+        req?.files?.RefundSS[0],
+        "screenshots/refund"
+      );
+
+    const refundSSUrl = req?.files?.RefundSS[0]
+      ? `${process.env.R2_PUBLIC_URL}/${refundSSKey}`
+      : null;
+
     if (!status) {
       return res.status(400).json({
         success: false,
@@ -247,6 +259,7 @@ const ordersController = {
 
     // ✅ Update order + push status history
     order.status = status;
+    order.RefundSS = refundSSUrl;
     order.statusHistory.push({
       previousStatus: oldStatus,
       newStatus: status,

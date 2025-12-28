@@ -14,7 +14,11 @@ router.get(
 );
 router.get("/:orderId", [authMiddleware], ordersController.getOrder);
 
-router.put("/:orderId", [authMiddleware], ordersController.updateOrderStatus);
+router.put(
+  "/:orderId",
+  [authMiddleware, upload.fields([{ name: "RefundSS", maxCount: 1 }])],
+  ordersController.updateOrderStatus
+);
 
 router.get("/", [authMiddleware], ordersController.getOrders);
 
@@ -25,7 +29,6 @@ router.post(
   upload.fields([
     { name: "OrderSS", maxCount: 1 },
     { name: "AmazonProductSS", maxCount: 1 },
-    { name: "RefundSS", maxCount: 1 },
   ]),
   validate(createOrderSchema), // 3️⃣ Validate parsed req.body
 
