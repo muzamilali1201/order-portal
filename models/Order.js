@@ -21,7 +21,7 @@ const orderSchema = mongoose.Schema(
         "PAID",
         "SEND_TO_SELLER",
         "HOLD",
-        "SENT"
+        "SENT",
       ],
       default: "ORDERED",
     },
@@ -51,7 +51,6 @@ const orderSchema = mongoose.Schema(
     },
     RefundSS: {
       type: String,
-      required: true,
     },
     comments: {
       type: String,

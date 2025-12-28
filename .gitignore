@@ -1,0 +1,4 @@
+/node_modules
+.env
+API_DOCUMENTATION.md
+SOCKET_DOCUMENTATION.md
