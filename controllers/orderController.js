@@ -23,7 +23,7 @@ const ADMIN_ALLOWED_STATUSES = [
   "COMISSION_COLLECTED",
   "PAID",
   "SEND_TO_SELLER",
-  "HOLD",
+  "ON HOLD",
   "SENT",
 ];
 
@@ -79,12 +79,14 @@ const ordersController = {
 
   getOrders: asyncHandler(async (req, res) => {
     const { filterBy, page = 1, perPage = 10, search = "" } = req.query;
+    const user = req.user;
     const skip = (Number(page) - 1) * Number(perPage);
     const query = {};
 
     const allowedStatuses = [
       "ORDERED",
       "REVIEWED",
+      "SEND_TO_SELLER",
       "REVIEW_AWAITED",
       "REFUND_DELAYED",
       "REFUNDED",
@@ -92,8 +94,11 @@ const ordersController = {
       "CANCELLED",
       "COMISSION_COLLECTED",
       "PAID",
-      "SEND_TO_SELLER",
     ];
+
+    if (user.role !== "admin") {
+      query.userId = user._id;
+    }
 
     if (filterBy && !allowedStatuses.includes(filterBy)) {
       throw new AppError(
@@ -102,7 +107,7 @@ const ordersController = {
       );
     }
 
-    if (filterBy) {
+    if (filterBy && user.role !== "admin") {
       query.status = filterBy;
     }
 

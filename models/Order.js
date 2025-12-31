@@ -20,7 +20,7 @@ const orderSchema = mongoose.Schema(
         "COMISSION_COLLECTED",
         "PAID",
         "SEND_TO_SELLER",
-        "HOLD",
+        "ON HOLD",
         "SENT",
       ],
       default: "ORDERED",
