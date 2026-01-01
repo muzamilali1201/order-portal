@@ -17,7 +17,7 @@ const orderSchema = mongoose.Schema(
         "REFUNDED",
         "CORRECTED",
         "CANCELLED",
-        "COMISSION_COLLECTED",
+        "COMMISSION_COLLECTED",
         "PAID",
         "SEND_TO_SELLER",
         "ON HOLD",
@@ -52,9 +52,35 @@ const orderSchema = mongoose.Schema(
     RefundSS: {
       type: String,
     },
-    comments: {
+    ReviewedSS: {
       type: String,
     },
+    commission: {
+      type: Number,
+    },
+    commentsHistory: [
+      {
+        comment: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        commentedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        role: {
+          type: String,
+          enum: ["admin", "user", "system"],
+          required: true,
+        },
+        commentedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
     statusHistory: [
       {
         previousStatus: String,

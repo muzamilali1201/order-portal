@@ -1,5 +1,9 @@
 const Order = require("../models/Order");
-const { uploadToR2 } = require("../services/r2.services");
+const {
+  uploadToR2,
+  extractR2KeyFromUrl,
+  deleteFromR2,
+} = require("../services/r2.services");
 const asyncHandler = require("../utils/asyncHandler");
 const AppError = require("../utils/AppError");
 const alertSystem = require("../models/AlertSystem");
@@ -20,7 +24,7 @@ const ADMIN_ALLOWED_STATUSES = [
   "REFUNDED",
   "CORRECTED",
   "CANCELLED",
-  "COMISSION_COLLECTED",
+  "COMMISSION_COLLECTED",
   "PAID",
   "SEND_TO_SELLER",
   "ON HOLD",
@@ -92,7 +96,7 @@ const ordersController = {
       "REFUNDED",
       "CORRECTED",
       "CANCELLED",
-      "COMISSION_COLLECTED",
+      "COMMISSION_COLLECTED",
       "PAID",
     ];
 
@@ -187,7 +191,7 @@ const ordersController = {
   }),
   updateOrderStatus: asyncHandler(async (req, res) => {
     const { orderId } = req.params;
-    const { status } = req.body;
+    const { status, commission } = req.body;
 
     if (req.user.role !== "admin" && req?.files?.RefundSS[0]) {
       return res.status(400).json({
@@ -198,15 +202,29 @@ const ordersController = {
 
     let refundSSKey = null;
 
-    if (req?.files?.RefundSS[0])
+    let reviewedSSKey = null;
+
+    if (req?.files?.ReviewSS?.length > 0)
+      reviewedSSKey = await uploadToR2(
+        req?.files?.ReviewSS[0],
+        "screenshots/review"
+      );
+
+    if (req?.files?.RefundSS?.length > 0)
       refundSSKey = await uploadToR2(
         req?.files?.RefundSS[0],
         "screenshots/refund"
       );
 
-    const refundSSUrl = req?.files?.RefundSS[0]
-      ? `${process.env.R2_PUBLIC_URL}/${refundSSKey}`
-      : null;
+    const refundSSUrl =
+      req?.files?.RefundSS?.length > 0
+        ? `${process.env.R2_PUBLIC_URL}/${refundSSKey}`
+        : null;
+
+    const reviewedSSUrl =
+      req?.files?.ReviewSS?.length > 0
+        ? `${process.env.R2_PUBLIC_URL}/${reviewedSSKey}`
+        : null;
 
     if (!status) {
       return res.status(400).json({
@@ -226,7 +244,6 @@ const ordersController = {
     const oldStatus = order.status;
     const userRole = req.user.role;
 
-    // 🔐 Role-based validation
     if (userRole === "admin") {
       if (!ADMIN_ALLOWED_STATUSES.includes(status)) {
         return res.status(400).json({
@@ -254,7 +271,6 @@ const ordersController = {
       }
     }
 
-    // 🚫 Prevent redundant updates
     if (oldStatus === status) {
       return res.status(400).json({
         success: false,
@@ -262,9 +278,10 @@ const ordersController = {
       });
     }
 
-    // ✅ Update order + push status history
     order.status = status;
     order.RefundSS = refundSSUrl;
+    order.ReviewedSS = reviewedSSUrl;
+    if (commission) order.commission = commission;
     order.statusHistory.push({
       previousStatus: oldStatus,
       newStatus: status,
@@ -275,7 +292,6 @@ const ordersController = {
 
     await order.save();
 
-    // 🧾 Optional: keep global alert collection (for feed)
     await alertSystem.create({
       orderId: order._id,
       changedBy: req.user._id,
@@ -310,6 +326,7 @@ const ordersController = {
     const order = await Order.findById(orderId)
       .populate("userId", "email username")
       .populate("statusHistory.changedBy", "email username")
+      .populate("commentsHistory.commentedBy", "email username commentedAt")
       .lean();
 
     if (!order) {
@@ -330,6 +347,89 @@ const ordersController = {
       success: true,
       message: "Order fetched successfully",
       data: order,
+    });
+  }),
+  addComment: asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+    const { comment } = req.body;
+
+    if (!comment?.trim()) {
+      throw new AppError("Comment is required", 400);
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new AppError("Order not found", 404);
+    }
+
+    const isAdmin = req.user.role === "admin";
+    const isOwner = order.userId.toString() === req.user._id.toString();
+
+    // 🔐 ONLY admin OR order owner
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to add comment to this order",
+      });
+    }
+
+    order.commentsHistory.push({
+      comment,
+      commentedBy: req.user._id,
+      role: req.user.role,
+    });
+
+    await order.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Comment added successfully",
+      data: order.commentsHistory,
+    });
+  }),
+  deleteOrder: asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    const isAdmin = req.user.role === "admin";
+    const isOwner = order.userId.toString() === req.user._id.toString();
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to delete this order",
+      });
+    }
+    let key = null;
+    // delete pictures from R2
+    if (order.OrderSS) {
+      key = extractR2KeyFromUrl(order.OrderSS);
+      await deleteFromR2(key);
+    }
+    if (order.AmazonProductSS) {
+      key = extractR2KeyFromUrl(order.AmazonProductSS);
+      await deleteFromR2(key);
+    }
+    if (order.RefundSS) {
+      key = extractR2KeyFromUrl(order.RefundSS);
+      await deleteFromR2(key);
+    }
+    if (order.ReviewedSS) {
+      key = extractR2KeyFromUrl(order.ReviewedSS);
+      await deleteFromR2(key);
+    }
+
+    await Order.findByIdAndDelete(orderId);
+
+    res.status(200).json({
+      success: true,
+      message: "Order deleted successfully",
     });
   }),
 };

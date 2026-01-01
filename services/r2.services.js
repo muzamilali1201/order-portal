@@ -1,5 +1,9 @@
 const sharp = require("sharp");
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+} = require("@aws-sdk/client-s3");
 const crypto = require("crypto");
 
 const r2 = new S3Client({
@@ -31,5 +35,22 @@ async function uploadToR2(file, folder = "misc") {
 
   return key;
 }
+async function deleteFromR2(key) {
+  if (!key) return;
 
-module.exports = { uploadToR2 };
+  await r2.send(
+    new DeleteObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: key,
+    })
+  );
+}
+
+function extractR2KeyFromUrl(url) {
+  if (!url) return null;
+
+  const baseUrl = process.env.R2_PUBLIC_URL;
+  return url.replace(`${baseUrl}/`, "");
+}
+
+module.exports = { uploadToR2, deleteFromR2, extractR2KeyFromUrl };
