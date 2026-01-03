@@ -12,6 +12,7 @@ const utc = require("dayjs/plugin/utc");
 const timezone = require("dayjs/plugin/timezone");
 const User = require("../models/User");
 const { getIO } = require("../socket");
+const Sheet = require("../models/Sheet");
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -40,14 +41,25 @@ const USER_ALLOWED_STATUSES = [
 
 const ordersController = {
   createOrder: asyncHandler(async (req, res) => {
-    const { amazonOrderNo, buyerPaypal, orderName, comments, buyerName } =
-      req.body;
+    const {
+      amazonOrderNo,
+      buyerPaypal,
+      orderName,
+      comments,
+      buyerName,
+      sheetName,
+    } = req.body;
 
     if (!req.files?.OrderSS || !req.files?.AmazonProductSS) {
       return res.status(400).json({
         success: false,
         message: "Order and Amazon Product screenshots are required",
       });
+    }
+    let sheet = null;
+    if (sheetName && sheetName.length > 0) {
+      const sheetExist = await Sheet.findOne({ name: sheetName });
+      sheet = sheetExist?._id;
     }
 
     const orderSSKey = await uploadToR2(
@@ -63,15 +75,24 @@ const ordersController = {
     const orderSSUrl = `${process.env.R2_PUBLIC_URL}/${orderSSKey}`;
     const productSSUrl = `${process.env.R2_PUBLIC_URL}/${productSSKey}`;
 
+    const commentsHistory = [
+      {
+        comment: comments,
+        commentedBy: req.user._id,
+        role: req.user.role,
+      },
+    ];
+
     const order = await Order.create({
       userId: req.user._id,
       amazonOrderNo,
       buyerPaypal,
       orderName,
-      comments,
+      commentsHistory,
       OrderSS: orderSSUrl,
       AmazonProductSS: productSSUrl,
       buyerName,
+      sheet,
     });
 
     res.status(201).json({
@@ -135,6 +156,7 @@ const ordersController = {
 
     const orders = await Order.find(query)
       .populate("userId", "email username")
+      .populate("sheet", "name")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(perPage))
@@ -327,6 +349,7 @@ const ordersController = {
       .populate("userId", "email username")
       .populate("statusHistory.changedBy", "email username")
       .populate("commentsHistory.commentedBy", "email username commentedAt")
+      .populate("sheet", "name")
       .lean();
 
     if (!order) {

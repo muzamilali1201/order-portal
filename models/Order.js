@@ -25,6 +25,10 @@ const orderSchema = mongoose.Schema(
       ],
       default: "ORDERED",
     },
+    sheet: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Sheet",
+    },
     amazonOrderNo: {
       type: String,
       required: true,

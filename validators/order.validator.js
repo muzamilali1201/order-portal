@@ -6,6 +6,7 @@ const createOrderSchema = Joi.object({
   orderName: Joi.string().min(3).required(),
   comments: Joi.string().allow("", null),
   buyerName: Joi.string().min(3).required(),
+  sheetName: Joi.string().allow("", null),
 });
 
 module.exports = {
