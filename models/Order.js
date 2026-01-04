@@ -19,7 +19,7 @@ const orderSchema = mongoose.Schema(
         "CANCELLED",
         "COMMISSION_COLLECTED",
         "PAID",
-        "SEND_TO_SELLER",
+        "SENT_TO SELLER",
         "ON HOLD",
         "SENT",
       ],
@@ -66,18 +66,15 @@ const orderSchema = mongoose.Schema(
       {
         comment: {
           type: String,
-          required: true,
           trim: true,
         },
         commentedBy: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "User",
-          required: true,
         },
         role: {
           type: String,
           enum: ["admin", "user", "system"],
-          required: true,
         },
         commentedAt: {
           type: Date,

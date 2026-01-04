@@ -27,7 +27,7 @@ const ADMIN_ALLOWED_STATUSES = [
   "CANCELLED",
   "COMMISSION_COLLECTED",
   "PAID",
-  "SEND_TO_SELLER",
+  "SENT_TO SELLER",
   "ON HOLD",
   "SENT",
 ];
@@ -48,6 +48,7 @@ const ordersController = {
       comments,
       buyerName,
       sheetName,
+      commission,
     } = req.body;
 
     if (!req.files?.OrderSS || !req.files?.AmazonProductSS) {
@@ -90,9 +91,22 @@ const ordersController = {
       orderName,
       commentsHistory,
       OrderSS: orderSSUrl,
+      commission,
       AmazonProductSS: productSSUrl,
       buyerName,
       sheet,
+    });
+
+    const io = getIO();
+    io.emit("newOrder", order);
+
+    await alertSystem.create({
+      orderId: order._id,
+      changedBy: req.user._id,
+      role: req.user.role,
+      previousStatus: "ORDERED",
+      newStatus: "ORDERED",
+      action: "CREATE_ORDER",
     });
 
     res.status(201).json({
@@ -111,7 +125,7 @@ const ordersController = {
     const allowedStatuses = [
       "ORDERED",
       "REVIEWED",
-      "SEND_TO_SELLER",
+      "SENT_TO SELLER",
       "REVIEW_AWAITED",
       "REFUND_DELAYED",
       "REFUNDED",
@@ -293,14 +307,13 @@ const ordersController = {
       }
     }
 
-    if (oldStatus === status) {
-      return res.status(400).json({
-        success: false,
-        message: "Order is already in this status",
-      });
+    let alert = false;
+
+    if (oldStatus !== status) {
+      alert = true;
+      order.status = status;
     }
 
-    order.status = status;
     order.RefundSS = refundSSUrl;
     order.ReviewedSS = reviewedSSUrl;
     if (commission) order.commission = commission;
@@ -314,27 +327,28 @@ const ordersController = {
 
     await order.save();
 
-    await alertSystem.create({
-      orderId: order._id,
-      changedBy: req.user._id,
-      role: req.user.role,
-      previousStatus: oldStatus,
-      newStatus: status,
-    });
-
-    // 🔴 Real-time event (everyone sees)
-    const io = getIO();
-    io.emit("order-status-changed", {
-      orderId: order._id,
-      previousStatus: oldStatus,
-      newStatus: status,
-      changedBy: {
-        id: req.user._id,
-        username: req.user.username,
+    if (alert) {
+      await alertSystem.create({
+        orderId: order._id,
+        changedBy: req.user._id,
         role: req.user.role,
-      },
-      createdAt: new Date(),
-    });
+        previousStatus: oldStatus,
+        newStatus: status,
+      });
+
+      const io = getIO();
+      io.emit("order-status-changed", {
+        orderId: order._id,
+        previousStatus: oldStatus,
+        newStatus: status,
+        changedBy: {
+          id: req.user._id,
+          username: req.user.username,
+          role: req.user.role,
+        },
+        createdAt: new Date(),
+      });
+    }
 
     res.status(200).json({
       success: true,
