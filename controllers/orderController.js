@@ -13,6 +13,7 @@ const timezone = require("dayjs/plugin/timezone");
 const User = require("../models/User");
 const { getIO } = require("../socket");
 const Sheet = require("../models/Sheet");
+const getNextStatusTime = require("../helpers/nextStatusTime");
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -84,6 +85,9 @@ const ordersController = {
       },
     ];
 
+    const nextStatusAt = new Date();
+    nextStatusAt.setDate(nextStatusAt.getDate() + 10);
+
     const order = await Order.create({
       userId: req.user._id,
       amazonOrderNo,
@@ -95,6 +99,7 @@ const ordersController = {
       AmazonProductSS: productSSUrl,
       buyerName,
       sheet,
+      nextStatusAt,
     });
 
     const io = getIO();
@@ -307,6 +312,8 @@ const ordersController = {
       }
     }
 
+    order.nextStatusAt = getNextStatusTime(status);
+
     let alert = false;
 
     if (oldStatus !== status) {
@@ -361,7 +368,7 @@ const ordersController = {
 
     const order = await Order.findById(orderId)
       .populate("userId", "email username")
-      .populate("statusHistory.changedBy", "email username")
+      .populate("statusHistory.changedBy", "email username role")
       .populate("commentsHistory.commentedBy", "email username commentedAt")
       .populate("sheet", "name")
       .lean();

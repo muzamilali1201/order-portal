@@ -10,11 +10,11 @@ const alertSystemSchema = new mongoose.Schema(
     changedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null,
     },
     role: {
       type: String,
-      enum: ["admin", "user"],
+      enum: ["admin", "user", "system"],
       required: true,
     },
     previousStatus: {

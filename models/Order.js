@@ -62,6 +62,10 @@ const orderSchema = mongoose.Schema(
     commission: {
       type: Number,
     },
+    nextStatusAt: {
+      type: Date,
+      index: true,
+    },
     commentsHistory: [
       {
         comment: {
