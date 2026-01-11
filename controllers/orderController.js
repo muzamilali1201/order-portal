@@ -138,6 +138,8 @@ const ordersController = {
       "CANCELLED",
       "COMMISSION_COLLECTED",
       "PAID",
+      "ON HOLD",
+      "SENT",
     ];
 
     if (user.role !== "admin") {
@@ -151,7 +153,7 @@ const ordersController = {
       );
     }
 
-    if (filterBy && user.role !== "admin") {
+    if (filterBy) {
       query.status = filterBy;
     }
 
