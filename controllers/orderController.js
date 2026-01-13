@@ -323,8 +323,13 @@ const ordersController = {
       order.status = status;
     }
 
-    order.RefundSS = refundSSUrl;
-    order.ReviewedSS = reviewedSSUrl;
+    if (refundSSUrl) {
+      order.RefundSS = refundSSUrl;
+    }
+
+    if (reviewedSSUrl) {
+      order.ReviewedSS = reviewedSSUrl;
+    }
     if (commission) order.commission = commission;
     order.statusHistory.push({
       previousStatus: oldStatus,

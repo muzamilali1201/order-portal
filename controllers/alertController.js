@@ -9,13 +9,23 @@ const alertController = {
     const limit = Number(perPage);
     const skip = (currentPage - 1) * limit;
 
+    const isAdmin = req.user.role === "admin";
+
+    // 🔐 base query
+    const query = {};
+
     const [history, total] = await Promise.all([
       alertSystem
-        .find()
+        .find(query)
         .populate([
           {
             path: "orderId",
             select: "-OrderSS -AmazonProductSS",
+            ...(isAdmin
+              ? {}
+              : {
+                  match: { userId: req.user._id }, // 👈 KEY LINE
+                }),
           },
           {
             path: "changedBy",
@@ -27,18 +37,25 @@ const alertController = {
         .limit(limit)
         .lean(),
 
-      alertSystem.countDocuments(),
+      alertSystem.countDocuments(query),
     ]);
+
+    // ❗ remove alerts where populate failed (non-owner orders)
+    const filteredHistory = isAdmin
+      ? history
+      : history.filter((h) => h.orderId !== null);
+
+    const totalFiltered = isAdmin ? total : filteredHistory.length;
 
     res.status(200).json({
       success: true,
       message: "Order history fetched successfully",
       page: currentPage,
       perPage: limit,
-      totalCount: total,
-      count: history.length,
-      totalPages: Math.ceil(total / limit),
-      data: history,
+      totalCount: totalFiltered,
+      count: filteredHistory.length,
+      totalPages: Math.ceil(totalFiltered / limit),
+      data: filteredHistory,
     });
   }),
 };
