@@ -207,7 +207,15 @@ const ordersController = {
     });
   }),
   getOverAllOrders: asyncHandler(async (req, res) => {
+    const admin = req.user?.role == "admin" ? true : false;
+    const match = {};
+
+    if (!admin) match.userId = req.user._id;
+
     const stats = await Order.aggregate([
+      {
+        $match: match,
+      },
       {
         $group: {
           _id: "$status",
@@ -223,7 +231,7 @@ const ordersController = {
       },
     ]);
 
-    const total = await Order.countDocuments();
+    const total = await Order.countDocuments(match);
     stats.push({ status: "TOTAL", count: total });
 
     res.status(200).json({
@@ -236,7 +244,7 @@ const ordersController = {
     const { orderId } = req.params;
     const { status, commission } = req.body;
 
-    if (req.user.role !== "admin" && req?.files?.RefundSS[0]) {
+    if (req.user.role !== "admin" && req?.files?.RefundSS?.[0]) {
       return res.status(400).json({
         success: false,
         message: "Only admin can upload refund screenshot",
