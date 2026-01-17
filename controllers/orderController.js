@@ -171,6 +171,7 @@ const ordersController = {
         { orderName: { $regex: search, $options: "i" } },
         { amazonOrderNo: { $regex: search, $options: "i" } },
         { buyerPaypal: { $regex: search, $options: "i" } },
+        { buyerName: { $regex: search, $options: "i" } },
         ...(userIds.length ? [{ userId: { $in: userIds } }] : []),
       ];
     }
@@ -178,7 +179,7 @@ const ordersController = {
     const orders = await Order.find(query)
       .populate("userId", "email username")
       .populate("sheet", "name")
-      .sort({ createdAt: -1 })
+      .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(Number(perPage))
       .lean();
