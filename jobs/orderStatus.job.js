@@ -165,5 +165,63 @@ cron.schedule(
   },
   {
     timezone: "Asia/Karachi", // 🇵🇰 guaranteed PKT
-  }
+  },
+);
+
+cron.schedule(
+  "0 0 1 * *",
+  async () => {
+    try {
+      console.log("📅 Running monthly commission collection job...");
+      const io = getIO();
+
+      const orders = await Order.find({
+        status: "REFUNDED",
+      });
+
+      for (const order of orders) {
+        const previousStatus = order.status;
+        const newStatus = "COMMISSION_COLLECTED";
+
+        order.status = newStatus;
+        order.nextStatusAt = null;
+
+        order.statusHistory.push({
+          previousStatus,
+          newStatus,
+          role: SYSTEM_ROLE,
+        });
+
+        await order.save();
+
+        await alertSystem.create({
+          orderId: order._id,
+          role: SYSTEM_ROLE,
+          previousStatus,
+          newStatus,
+          action: "MONTHLY_COMMISSION_COLLECTION",
+        });
+
+        io.emit("order-status-changed", {
+          orderId: order._id,
+          previousStatus,
+          newStatus,
+          role: SYSTEM_ROLE,
+          createdAt: new Date(),
+          changedBy: {
+            id: null,
+            username: "System",
+            role: SYSTEM_ROLE,
+          },
+        });
+      }
+
+      console.log(`✅ Monthly job completed: ${orders.length} orders updated`);
+    } catch (err) {
+      console.error("❌ Monthly commission job failed:", err);
+    }
+  },
+  {
+    timezone: "Asia/Karachi",
+  },
 );

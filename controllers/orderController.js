@@ -171,7 +171,7 @@ const ordersController = {
         { orderName: { $regex: search, $options: "i" } },
         { amazonOrderNo: { $regex: search, $options: "i" } },
         { buyerPaypal: { $regex: search, $options: "i" } },
-        { buyerName: { $regex: search, $options: "i" } },
+      { buyerName: { $regex: search, $options: "i" } },
         ...(userIds.length ? [{ userId: { $in: userIds } }] : []),
       ];
     }
