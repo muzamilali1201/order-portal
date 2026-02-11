@@ -88,6 +88,25 @@ const alertSystem = require("../models/AlertSystem");
 const { getIO } = require("../socket");
 
 const SYSTEM_ROLE = "system";
+const SENT_TO_SELLER_STATUSES = ["SENT_TO SELLER", "SENT_TO_SELLER"];
+
+function getSentToSellerAt(order) {
+  let sentToSellerAt = null;
+  if (Array.isArray(order.statusHistory)) {
+    for (const entry of order.statusHistory) {
+      if (SENT_TO_SELLER_STATUSES.includes(entry?.newStatus)) {
+        const changedAt = entry?.changedAt ? new Date(entry.changedAt) : null;
+        if (changedAt && (!sentToSellerAt || changedAt > sentToSellerAt)) {
+          sentToSellerAt = changedAt;
+        }
+      }
+    }
+  }
+  if (!sentToSellerAt && order.updatedAt) {
+    sentToSellerAt = new Date(order.updatedAt);
+  }
+  return sentToSellerAt;
+}
 
 // runs EVERY MINUTE (exact timing)
 cron.schedule(
@@ -100,14 +119,43 @@ cron.schedule(
 
       const orders = await Order.find({
         nextStatusAt: { $lte: now },
-      });
+      }).populate("sheet", "name");
 
       for (const order of orders) {
         let newStatus = null;
 
         if (order.status === "ORDERED") {
           newStatus = "REVIEW_AWAITED";
-        } else if (order.status === "SENT_TO SELLER") {
+        } else if (SENT_TO_SELLER_STATUSES.includes(order.status)) {
+          const sentToSellerAt = getSentToSellerAt(order);
+          if (sentToSellerAt) {
+            const softReminderAt = new Date(sentToSellerAt);
+            softReminderAt.setDate(softReminderAt.getDate() + 3);
+
+            if (now < softReminderAt) {
+              order.nextStatusAt = softReminderAt;
+              await order.save();
+              continue;
+            }
+          }
+
+          newStatus = "SOFT_REMINDER";
+        } else if (order.status === "SOFT_REMINDER") {
+          const sheetName = order.sheet?.name?.toLowerCase();
+          const sentToSellerAt = getSentToSellerAt(order);
+          if (sentToSellerAt) {
+            const targetDate = new Date(sentToSellerAt);
+            targetDate.setDate(
+              targetDate.getDate() + (sheetName === "adverzpro" ? 7 : 5)
+            );
+
+            if (now < targetDate) {
+              order.nextStatusAt = targetDate;
+              await order.save();
+              continue;
+            }
+          }
+
           newStatus = "REFUND_DELAYED";
         }
 
@@ -124,8 +172,21 @@ cron.schedule(
         const next = new Date();
 
         if (newStatus === "SENT_TO SELLER") {
-          next.setDate(next.getDate() + 5);
+          next.setDate(next.getDate() + 3);
           order.nextStatusAt = next;
+        } else if (newStatus === "SOFT_REMINDER") {
+          const sheetName = order.sheet?.name?.toLowerCase();
+          const sentToSellerAt = getSentToSellerAt(order);
+          if (sentToSellerAt) {
+            const targetDate = new Date(sentToSellerAt);
+            targetDate.setDate(
+              targetDate.getDate() + (sheetName === "adverzpro" ? 7 : 5)
+            );
+            order.nextStatusAt = targetDate;
+          } else {
+            next.setDate(next.getDate() + 2);
+            order.nextStatusAt = next;
+          }
         } else {
           order.nextStatusAt = null;
         }

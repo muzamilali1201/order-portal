@@ -8,7 +8,12 @@ function getNextStatusTime(status) {
   }
 
   if (status === "SENT_TO SELLER") {
-    date.setDate(date.getDate() + 5);
+    date.setDate(date.getDate() + 3);
+    return date;
+  }
+
+  if (status === "SOFT_REMINDER") {
+    date.setDate(date.getDate() + 2);
     return date;
   }
 

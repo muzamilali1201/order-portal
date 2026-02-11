@@ -14,6 +14,7 @@ const orderSchema = mongoose.Schema(
         "REVIEWED",
         "REVIEW_AWAITED",
         "REFUND_DELAYED",
+        "SOFT_REMINDER",
         "REFUNDED",
         "CORRECTED",
         "CANCELLED",
