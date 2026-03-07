@@ -11,9 +11,12 @@ const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const timezone = require("dayjs/plugin/timezone");
 const User = require("../models/User");
-const { getIO } = require("../socket");
 const Sheet = require("../models/Sheet");
 const getNextStatusTime = require("../helpers/nextStatusTime");
+const {
+  emitOrderStatusChanged,
+  emitNewOrder,
+} = require("../services/notification.service");
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -103,16 +106,18 @@ const ordersController = {
       nextStatusAt,
     });
 
-    const io = getIO();
-    io.emit("newOrder", order);
-
-    await alertSystem.create({
+    const alert = await alertSystem.create({
       orderId: order._id,
       changedBy: req.user._id,
       role: req.user.role,
       previousStatus: "ORDERED",
       newStatus: "ORDERED",
       action: "CREATE_ORDER",
+    });
+
+    await emitNewOrder(order, {
+      ...order.toObject(),
+      createdAt: alert.createdAt,
     });
 
     res.status(201).json({
@@ -167,13 +172,19 @@ const ordersController = {
         ],
       }).select("_id");
 
+      const sheets = await Sheet.find({
+        name: { $regex: search, $options: "i" },
+      }).select("_id");
+
       const userIds = users.map((u) => u._id);
+      const sheetIds = sheets.map((s) => s._id);
 
       query.$or = [
         { orderName: { $regex: search, $options: "i" } },
         { amazonOrderNo: { $regex: search, $options: "i" } },
         { buyerPaypal: { $regex: search, $options: "i" } },
-      { buyerName: { $regex: search, $options: "i" } },
+        { buyerName: { $regex: search, $options: "i" } },
+        ...(sheetIds.length ? [{ sheet: { $in: sheetIds } }] : []),
         ...(userIds.length ? [{ userId: { $in: userIds } }] : []),
       ];
     }
@@ -353,7 +364,7 @@ const ordersController = {
     await order.save();
 
     if (alert) {
-      await alertSystem.create({
+      const alertEntry = await alertSystem.create({
         orderId: order._id,
         changedBy: req.user._id,
         role: req.user.role,
@@ -361,8 +372,8 @@ const ordersController = {
         newStatus: status,
       });
 
-      const io = getIO();
-      io.emit("order-status-changed", {
+      await emitOrderStatusChanged(order, {
+        alertId: String(alertEntry._id),
         orderId: order._id,
         previousStatus: oldStatus,
         newStatus: status,
@@ -371,7 +382,7 @@ const ordersController = {
           username: req.user.username,
           role: req.user.role,
         },
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(),
       });
     }
 

@@ -85,7 +85,7 @@
 const cron = require("node-cron");
 const Order = require("../models/Order");
 const alertSystem = require("../models/AlertSystem");
-const { getIO } = require("../socket");
+const { emitOrderStatusChanged } = require("../services/notification.service");
 
 const SYSTEM_ROLE = "system";
 const SENT_TO_SELLER_STATUSES = ["SENT_TO SELLER", "SENT_TO_SELLER"];
@@ -114,7 +114,6 @@ cron.schedule(
   async () => {
     try {
       const now = new Date();
-      const io = getIO();
       console.log("Job is running");
 
       const orders = await Order.find({
@@ -199,7 +198,7 @@ cron.schedule(
 
         await order.save();
 
-        await alertSystem.create({
+        const alertEntry = await alertSystem.create({
           orderId: order._id,
           role: SYSTEM_ROLE,
           previousStatus,
@@ -207,7 +206,8 @@ cron.schedule(
           action: "AUTO_STATUS_CHANGE",
         });
 
-        io.emit("order-status-changed", {
+        await emitOrderStatusChanged(order, {
+          alertId: String(alertEntry._id),
           orderId: order._id,
           previousStatus,
           newStatus,
@@ -234,7 +234,6 @@ cron.schedule(
   async () => {
     try {
       console.log("📅 Running monthly commission collection job...");
-      const io = getIO();
 
       const orders = await Order.find({
         status: "REFUNDED",
@@ -255,7 +254,7 @@ cron.schedule(
 
         await order.save();
 
-        await alertSystem.create({
+        const alertEntry = await alertSystem.create({
           orderId: order._id,
           role: SYSTEM_ROLE,
           previousStatus,
@@ -263,7 +262,8 @@ cron.schedule(
           action: "MONTHLY_COMMISSION_COLLECTION",
         });
 
-        io.emit("order-status-changed", {
+        await emitOrderStatusChanged(order, {
+          alertId: String(alertEntry._id),
           orderId: order._id,
           previousStatus,
           newStatus,
