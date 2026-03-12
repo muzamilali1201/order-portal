@@ -1,4 +1,5 @@
 const Order = require("../models/Order");
+const User = require("../models/User");
 const { getIO } = require("../socket");
 const { userRoom } = require("../utils/socketRooms");
 
@@ -9,11 +10,18 @@ async function getRelevantUserIdsForOrder(orderOrId) {
     order = await Order.findById(orderOrId).select("userId").lean();
   }
 
-  if (!order?.userId) {
-    return [];
+  const userIds = new Set();
+
+  if (order?.userId) {
+    userIds.add(String(order.userId));
   }
 
-  return [String(order.userId)];
+  const admins = await User.find({ role: "admin" }).select("_id").lean();
+  for (const admin of admins) {
+    userIds.add(String(admin._id));
+  }
+
+  return [...userIds];
 }
 
 function emitToUsers(eventName, payload, userIds) {

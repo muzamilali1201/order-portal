@@ -23,28 +23,34 @@ const alertController = {
       }
     }
 
-    const ownerOrderQuery = { userId: req.user._id };
-    if (orderId && mongoose.Types.ObjectId.isValid(orderId)) {
-      ownerOrderQuery._id = orderId;
+    if (req.user.role === "admin") {
+      if (orderId && mongoose.Types.ObjectId.isValid(orderId)) {
+        query.orderId = orderId;
+      }
+    } else {
+      const ownerOrderQuery = { userId: req.user._id };
+      if (orderId && mongoose.Types.ObjectId.isValid(orderId)) {
+        ownerOrderQuery._id = orderId;
+      }
+
+      const ownOrders = await Order.find(ownerOrderQuery).select("_id").lean();
+      const ownOrderIds = ownOrders.map((o) => o._id);
+
+      if (ownOrderIds.length === 0) {
+        return res.status(200).json({
+          success: true,
+          message: "Order history fetched successfully",
+          page: currentPage,
+          perPage: limit,
+          totalCount: 0,
+          count: 0,
+          totalPages: 0,
+          data: [],
+        });
+      }
+
+      query.orderId = { $in: ownOrderIds };
     }
-
-    const ownOrders = await Order.find(ownerOrderQuery).select("_id").lean();
-    const ownOrderIds = ownOrders.map((o) => o._id);
-
-    if (ownOrderIds.length === 0) {
-      return res.status(200).json({
-        success: true,
-        message: "Order history fetched successfully",
-        page: currentPage,
-        perPage: limit,
-        totalCount: 0,
-        count: 0,
-        totalPages: 0,
-        data: [],
-      });
-    }
-
-    query.orderId = { $in: ownOrderIds };
 
     const [history, total] = await Promise.all([
       alertSystem
