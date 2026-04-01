@@ -1,6 +1,7 @@
+const { addBusinessDays } = require("./businessDays");
+
 function getNextStatusTime(status) {
   const date = new Date();
-
 
   if (status === "ORDERED") {
     date.setDate(date.getDate() + 10);
@@ -8,13 +9,11 @@ function getNextStatusTime(status) {
   }
 
   if (status === "SENT_TO SELLER") {
-    date.setDate(date.getDate() + 3);
-    return date;
+    return addBusinessDays(date, 3);
   }
 
   if (status === "SOFT_REMINDER") {
-    date.setDate(date.getDate() + 2);
-    return date;
+    return addBusinessDays(date, 2);
   }
 
   return null; // no auto transition

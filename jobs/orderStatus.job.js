@@ -86,6 +86,7 @@ const cron = require("node-cron");
 const Order = require("../models/Order");
 const alertSystem = require("../models/AlertSystem");
 const { emitOrderStatusChanged } = require("../services/notification.service");
+const { addBusinessDays } = require("../helpers/businessDays");
 
 const SYSTEM_ROLE = "system";
 const SENT_TO_SELLER_STATUSES = ["SENT_TO SELLER", "SENT_TO_SELLER"];
@@ -128,8 +129,7 @@ cron.schedule(
         } else if (SENT_TO_SELLER_STATUSES.includes(order.status)) {
           const sentToSellerAt = getSentToSellerAt(order);
           if (sentToSellerAt) {
-            const softReminderAt = new Date(sentToSellerAt);
-            softReminderAt.setDate(softReminderAt.getDate() + 3);
+            const softReminderAt = addBusinessDays(sentToSellerAt, 3);
 
             if (now < softReminderAt) {
               order.nextStatusAt = softReminderAt;
@@ -143,9 +143,9 @@ cron.schedule(
           const sheetName = order.sheet?.name?.toLowerCase();
           const sentToSellerAt = getSentToSellerAt(order);
           if (sentToSellerAt) {
-            const targetDate = new Date(sentToSellerAt);
-            targetDate.setDate(
-              targetDate.getDate() + (sheetName === "adverzpro" ? 7 : 5)
+            const targetDate = addBusinessDays(
+              sentToSellerAt,
+              sheetName === "adverzpro" ? 7 : 5
             );
 
             if (now < targetDate) {
@@ -171,20 +171,18 @@ cron.schedule(
         const next = new Date();
 
         if (newStatus === "SENT_TO SELLER") {
-          next.setDate(next.getDate() + 3);
-          order.nextStatusAt = next;
+          order.nextStatusAt = addBusinessDays(next, 3);
         } else if (newStatus === "SOFT_REMINDER") {
           const sheetName = order.sheet?.name?.toLowerCase();
           const sentToSellerAt = getSentToSellerAt(order);
           if (sentToSellerAt) {
-            const targetDate = new Date(sentToSellerAt);
-            targetDate.setDate(
-              targetDate.getDate() + (sheetName === "adverzpro" ? 7 : 5)
+            const targetDate = addBusinessDays(
+              sentToSellerAt,
+              sheetName === "adverzpro" ? 7 : 5
             );
             order.nextStatusAt = targetDate;
           } else {
-            next.setDate(next.getDate() + 2);
-            order.nextStatusAt = next;
+            order.nextStatusAt = addBusinessDays(next, 2);
           }
         } else {
           order.nextStatusAt = null;
