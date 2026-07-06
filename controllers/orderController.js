@@ -70,12 +70,12 @@ const ordersController = {
 
     const orderSSKey = await uploadToR2(
       req.files.OrderSS[0],
-      "screenshots/order"
+      "screenshots/order",
     );
 
     const productSSKey = await uploadToR2(
       req.files.AmazonProductSS[0],
-      "screenshots/amazon"
+      "screenshots/amazon",
     );
 
     const orderSSUrl = `${process.env.R2_PUBLIC_URL}/${orderSSKey}`;
@@ -156,7 +156,7 @@ const ordersController = {
     if (filterBy && !allowedStatuses.includes(filterBy)) {
       throw new AppError(
         `Invalid filter value, there's no status exists with "${filterBy}" name`,
-        400
+        400,
       );
     }
 
@@ -256,7 +256,14 @@ const ordersController = {
   }),
   updateOrderStatus: asyncHandler(async (req, res) => {
     const { orderId } = req.params;
-    const { status, commission } = req.body;
+    const {
+      status,
+      commission,
+      orderName,
+      amazonOrderNo,
+      buyerName,
+      buyerPaypal,
+    } = req.body;
 
     if (req.user.role !== "admin" && req?.files?.RefundSS?.[0]) {
       return res.status(400).json({
@@ -272,13 +279,13 @@ const ordersController = {
     if (req?.files?.ReviewSS?.length > 0)
       reviewedSSKey = await uploadToR2(
         req?.files?.ReviewSS[0],
-        "screenshots/review"
+        "screenshots/review",
       );
 
     if (req?.files?.RefundSS?.length > 0)
       refundSSKey = await uploadToR2(
         req?.files?.RefundSS[0],
-        "screenshots/refund"
+        "screenshots/refund",
       );
 
     const refundSSUrl =
@@ -314,7 +321,7 @@ const ordersController = {
         return res.status(400).json({
           success: false,
           message: `Admin cannot set status to "${status}". Allowed: ${ADMIN_ALLOWED_STATUSES.join(
-            ", "
+            ", ",
           )}`,
         });
       }
@@ -323,7 +330,7 @@ const ordersController = {
         return res.status(400).json({
           success: false,
           message: `User cannot set status to "${status}". Allowed: ${USER_ALLOWED_STATUSES.join(
-            ", "
+            ", ",
           )}`,
         });
       }
@@ -339,6 +346,22 @@ const ordersController = {
     order.nextStatusAt = getNextStatusTime(status);
 
     let alert = false;
+
+    if (orderName && orderName.trim() !== order.orderName) {
+      order.orderName = orderName.trim();
+    }
+
+    if (amazonOrderNo && amazonOrderNo.trim() !== order.amazonOrderNo) {
+      order.amazonOrderNo = amazonOrderNo.trim();
+    }
+
+    if (buyerName && buyerName.trim() !== order.buyerName) {
+      order.buyerName = buyerName.trim();
+    }
+
+    if (buyerPaypal && buyerPaypal.trim() !== order.buyerPaypal) {
+      order.buyerPaypal = buyerPaypal.trim();
+    }
 
     if (oldStatus !== status) {
       alert = true;
@@ -412,7 +435,7 @@ const ordersController = {
     // 🔄 Sort statusHistory (latest first)
     if (Array.isArray(order.statusHistory)) {
       order.statusHistory.sort(
-        (a, b) => new Date(b.changedAt) - new Date(a.changedAt)
+        (a, b) => new Date(b.changedAt) - new Date(a.changedAt),
       );
     }
 
